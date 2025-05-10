@@ -2,7 +2,7 @@ from app import app
 from flask import Response, redirect
 
 
-@app.route("/redirect-absolute")
+@app.route("/redirect-absolute", methods=["GET", "POST"])
 def redirect_absolute():
     return redirect("http://localhost:8000/redirected")
 
