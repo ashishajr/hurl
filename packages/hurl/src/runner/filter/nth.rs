@@ -24,19 +24,27 @@ pub fn eval_nth(
     value: &Value,
     source_info: SourceInfo,
     assert: bool,
-    n: u64,
+    n: i64,
 ) -> Result<Option<Value>, RunnerError> {
     match value {
-        Value::List(values) => match values.get(n as usize) {
-            None => {
-                let kind = RunnerErrorKind::FilterInvalidInput(format!(
-                    "Out of bound - size is {}",
-                    values.len()
-                ));
-                Err(RunnerError::new(source_info, kind, assert))
+        Value::List(values) => {
+            let index: usize = if n >= 0 {
+                n as usize
+            } else {
+                let size = values.len() as i64;
+                (size + n) as usize
+            };
+            match values.get(index) {
+                None => {
+                    let kind = RunnerErrorKind::FilterInvalidInput(format!(
+                        "Out of bound - size is {}",
+                        values.len()
+                    ));
+                    Err(RunnerError::new(source_info, kind, assert))
+                }
+                Some(value) => Ok(Some(value.clone())),
             }
-            Some(value) => Ok(Some(value.clone())),
-        },
+        }
         v => {
             let kind = RunnerErrorKind::FilterInvalidInput(v.repr());
             Err(RunnerError::new(source_info, kind, assert))
@@ -46,7 +54,7 @@ pub fn eval_nth(
 
 #[cfg(test)]
 mod tests {
-    use hurl_core::ast::{Filter, FilterValue, SourceInfo, Whitespace, U64};
+    use hurl_core::ast::{Filter, FilterValue, SourceInfo, Whitespace, I64};
     use hurl_core::reader::Pos;
     use hurl_core::typing::ToSource;
 
@@ -54,12 +62,12 @@ mod tests {
     use crate::runner::{Number, RunnerError, RunnerErrorKind, Value, VariableSet};
 
     #[test]
-    fn eval_filter_nth() {
+    fn eval_filter_nth_positive() {
         let variables = VariableSet::new();
         let filter = Filter {
             source_info: SourceInfo::new(Pos::new(1, 1), Pos::new(1, 1)),
             value: FilterValue::Nth {
-                n: U64::new(2, "2".to_source()),
+                n: I64::new(2, "2".to_source()),
                 space0: Whitespace {
                     value: String::new(),
                     source_info: SourceInfo::new(Pos::new(0, 0), Pos::new(0, 0)),
@@ -98,6 +106,53 @@ mod tests {
             RunnerError::new(
                 SourceInfo::new(Pos::new(1, 1), Pos::new(1, 1)),
                 RunnerErrorKind::FilterInvalidInput("Out of bound - size is 2".to_string()),
+                false
+            )
+        );
+    }
+
+    #[test]
+    fn eval_filter_nth_negative() {
+        let variables = VariableSet::new();
+        let filter = Filter {
+            source_info: SourceInfo::new(Pos::new(1, 1), Pos::new(1, 1)),
+            value: FilterValue::Nth {
+                n: I64::new(-2, "-2".to_source()),
+                space0: Whitespace {
+                    value: String::new(),
+                    source_info: SourceInfo::new(Pos::new(0, 0), Pos::new(0, 0)),
+                },
+            },
+        };
+
+        assert_eq!(
+            eval_filter(
+                &filter,
+                &Value::List(vec![
+                    Value::Number(Number::Integer(0)),
+                    Value::Number(Number::Integer(1)),
+                    Value::Number(Number::Integer(2)),
+                    Value::Number(Number::Integer(3))
+                ]),
+                &variables,
+                false
+            )
+            .unwrap()
+            .unwrap(),
+            Value::Number(Number::Integer(2))
+        );
+        assert_eq!(
+            eval_filter(
+                &filter,
+                &Value::List(vec![Value::Number(Number::Integer(0))]),
+                &variables,
+                false
+            )
+            .err()
+            .unwrap(),
+            RunnerError::new(
+                SourceInfo::new(Pos::new(1, 1), Pos::new(1, 1)),
+                RunnerErrorKind::FilterInvalidInput("Out of bound - size is 1".to_string()),
                 false
             )
         );
