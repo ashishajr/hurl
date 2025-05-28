@@ -547,6 +547,10 @@ fn log_errors(
 
     if logger.error_format == ErrorFormat::Long {
         if let Some(Call { response, .. }) = entry_result.calls.last() {
+            logger.info("Request can be run with the following curl command:");
+            logger.info(&entry_result.curl_cmd.to_string());
+            logger.info("");
+
             response.log_info_all(logger);
         }
     }
